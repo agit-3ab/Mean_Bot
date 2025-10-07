@@ -11,6 +11,7 @@ class AdminTelegramService {
     this.attendanceService = null; // Will be set by server
     this.userState = {}; // For storing user interaction states
     this.serverControl = null; // Will be set by server for shutdown/restart functionality
+    this.commandsRegistered = false; // Flag to prevent duplicate command registration
     
     // Log admin configuration for debugging
     console.log('Admin Bot Configuration:');
@@ -64,7 +65,16 @@ class AdminTelegramService {
    * Setup bot commands
    */
   setupCommands() {
-    if (!this.bot) return;
+    if (!this.bot || this.commandsRegistered) {
+      // Prevent duplicate command registration
+      if (this.commandsRegistered) {
+        console.log('⚠️ Admin commands already registered, skipping duplicate registration');
+      }
+      return;
+    }
+
+    // Mark commands as registered to prevent duplicates
+    this.commandsRegistered = true;
     
     // We've removed password authentication - no need to handle text messages
 
@@ -1974,6 +1984,17 @@ _Admin Report by Attendance Automation System_`;
         success: false,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * Stop the bot and cleanup
+   */
+  stopBot() {
+    if (this.bot) {
+      console.log('Stopping Admin Telegram bot polling...');
+      this.bot.stopPolling();
+      this.commandsRegistered = false;
     }
   }
 

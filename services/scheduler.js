@@ -1,13 +1,12 @@
 const cron = require('node-cron');
 const AttendanceService = require('./attendanceService');
-const TelegramService = require('./telegramService');
 
 class Scheduler {
-  constructor() {
-    // Create a single telegram service instance
-    this.telegramService = new TelegramService();
+  constructor(telegramService = null) {
+    // Don't create a new telegram service - use the one passed from server
+    this.telegramService = telegramService;
     // Pass it to attendance service to avoid duplicate bot instances
-    this.attendanceService = new AttendanceService(this.telegramService);
+    this.attendanceService = new AttendanceService(telegramService);
     // Set scheduler reference in attendance service
     this.attendanceService.setScheduler(this);
     this.adminTelegramService = null; // Will be set from server

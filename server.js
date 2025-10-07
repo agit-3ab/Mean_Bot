@@ -24,12 +24,12 @@ const startService = async () => {
       console.log('Running without database (mock mode)');
     }
 
-    // Initialize and start scheduler
-    scheduler = new Scheduler();
-    
-    // Initialize telegram services
+    // Initialize telegram services first
     adminTelegramService = new AdminTelegramService();
     telegramService = new TelegramService();
+    
+    // Initialize scheduler with the telegram service to avoid duplicate instances
+    scheduler = new Scheduler(telegramService);
     
     // Share the attendance service instance with services
     adminTelegramService.setAttendanceService(scheduler.attendanceService);
@@ -120,6 +120,14 @@ process.on('SIGTERM', async () => {
     scheduler.stopAll(); // This also records clean shutdown
   }
   
+  // Stop telegram bots
+  if (telegramService) {
+    telegramService.stopBot();
+  }
+  if (adminTelegramService) {
+    adminTelegramService.stopBot();
+  }
+  
   process.exit(0);
 });
 
@@ -141,6 +149,14 @@ process.on('SIGINT', async () => {
   // Stop all tasks and record clean shutdown
   if (scheduler) {
     scheduler.stopAll(); // This also records clean shutdown
+  }
+  
+  // Stop telegram bots
+  if (telegramService) {
+    telegramService.stopBot();
+  }
+  if (adminTelegramService) {
+    adminTelegramService.stopBot();
   }
   
   process.exit(0);
@@ -213,6 +229,14 @@ const serverControl = {
       scheduler.stopAll(); // This also records clean shutdown
     }
     
+    // Stop telegram bots
+    if (telegramService) {
+      telegramService.stopBot();
+    }
+    if (adminTelegramService) {
+      adminTelegramService.stopBot();
+    }
+    
     // Exit the process
     process.exit(0);
   },
@@ -226,6 +250,14 @@ const serverControl = {
     // Store the requesting admin's chat ID for restart notification
     if (requesterChatId) {
       process.env.RESTART_REQUESTER_CHAT_ID = requesterChatId.toString();
+    }
+    
+    // Stop telegram bots before restart
+    if (telegramService) {
+      telegramService.stopBot();
+    }
+    if (adminTelegramService) {
+      adminTelegramService.stopBot();
     }
     
     // Exit with code 1 to signal restart to process manager

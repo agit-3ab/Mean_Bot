@@ -7,6 +7,7 @@ class TelegramService {
     this.attendanceService = null; // Will be set by server
     this.registrationSessions = new Map(); // Store user registration sessions
     this.passwordChangeSessions = new Map(); // Store password change sessions
+    this.commandsRegistered = false; // Flag to prevent duplicate command registration
     
     if (this.botToken) {
       this.bot = new TelegramBot(this.botToken, { polling: true });
@@ -30,7 +31,16 @@ class TelegramService {
    * Setup bot commands
    */
   setupCommands() {
-    if (!this.bot) return;
+    if (!this.bot || this.commandsRegistered) {
+      // Prevent duplicate command registration
+      if (this.commandsRegistered) {
+        console.log('⚠️ Commands already registered, skipping duplicate registration');
+      }
+      return;
+    }
+
+    // Mark commands as registered to prevent duplicates
+    this.commandsRegistered = true;
 
     // Handle /start command
     this.bot.onText(/\/start/, async (msg) => {
@@ -557,6 +567,17 @@ _Attendance Automation System_`;
         success: false,
         error: error.message
       };
+    }
+  }
+
+  /**
+   * Stop the bot and cleanup
+   */
+  stopBot() {
+    if (this.bot) {
+      console.log('Stopping Telegram bot polling...');
+      this.bot.stopPolling();
+      this.commandsRegistered = false;
     }
   }
 
