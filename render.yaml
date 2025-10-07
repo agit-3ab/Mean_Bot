@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: mean-bot
+    env: node
+    plan: starter
+    region: oregon # Change to your preferred region
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HEADLESS_MODE
+        value: true
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/google-chrome-stable
+    # Environment variables that need to be set in Render dashboard:
+    # - MONGODB_URI (MongoDB connection string)
+    # - ENCRYPTION_KEY (32 character encryption key)
+    # - TELEGRAM_BOT_TOKEN (from BotFather)
+    # - ADMIN_TELEGRAM_BOT_TOKEN (from BotFather)
+    # - ADMIN_TELEGRAM_CHAT_IDS (comma-separated chat IDs)
+    # - ATTENDANCE_CHECK_TIME (e.g., "08:00")
+    # - MITS_IMS_URL (e.g., "http://mitsims.in")
+    # - USE_MOCK_DATA (set to "false" for production)

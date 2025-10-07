@@ -20,7 +20,10 @@ class MITSIMSScraper {
       // Set headless based on environment variable for debugging
       const isHeadless = process.env.HEADLESS_MODE !== 'false';
       
-      this.browser = await puppeteer.launch({
+      // Get Puppeteer executable path (for cloud deployment)
+      const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
+      
+      const launchOptions = {
         headless: isHeadless ? 'new' : false,
         slowMo: 100, // Slow down by 100ms for visibility
         args: [
@@ -29,9 +32,18 @@ class MITSIMSScraper {
           '--disable-dev-shm-usage',
           '--disable-accelerated-2d-canvas',
           '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
           '--window-size=1366,768'
         ]
-      });
+      };
+      
+      // Add executable path if provided (for cloud deployment)
+      if (executablePath) {
+        launchOptions.executablePath = executablePath;
+      }
+      
+      this.browser = await puppeteer.launch(launchOptions);
       
       this.page = await this.browser.newPage();
       await this.page.setViewport({ width: 1366, height: 768 });
