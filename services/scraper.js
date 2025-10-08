@@ -31,62 +31,99 @@ class MITSIMSScraper {
         
         console.log('🔍 Searching for Chrome executable...');
         
-        // Method 1: Use find command to locate Chrome
+        // Method 0: Check if build script saved the path
         try {
-          const findResult = execSync(
-            'find /opt/render/.cache/puppeteer -name "chrome" -type f -executable 2>/dev/null | head -n 1',
-            { encoding: 'utf8', timeout: 10000 }
-          ).trim();
+          const cacheDir = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+          const savedPathFile = path.join(cacheDir, 'chrome_path.txt');
           
-          if (findResult && fs.existsSync(findResult)) {
-            executablePath = findResult;
-            console.log(`✅ Found Chrome via find command: ${executablePath}`);
+          if (fs.existsSync(savedPathFile)) {
+            const savedPath = fs.readFileSync(savedPathFile, 'utf8').trim();
+            if (savedPath && fs.existsSync(savedPath)) {
+              executablePath = savedPath;
+              console.log(`✅ Found Chrome from build script: ${executablePath}`);
+            }
           }
         } catch (e) {
-          console.log('⚠️  find command failed:', e.message);
+          console.log('⚠️  Could not read saved Chrome path:', e.message);
+        }
+        
+        // Method 1: Use find command to locate Chrome (with multiple possible names)
+        if (!executablePath) {
+          try {
+            const findResult = execSync(
+              'find /opt/render/.cache/puppeteer -type f -executable \\( -name "chrome" -o -name "chromium" -o -name "chrome-headless-shell" \\) 2>/dev/null | head -n 1',
+              { encoding: 'utf8', timeout: 10000 }
+            ).trim();
+            
+            if (findResult && fs.existsSync(findResult)) {
+              executablePath = findResult;
+              console.log(`✅ Found Chrome via find command: ${executablePath}`);
+            }
+          } catch (e) {
+            console.log('⚠️  find command failed:', e.message);
+          }
         }
         
         // Method 2: Check common Puppeteer cache locations
         if (!executablePath) {
           const cacheDir = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
-          const possiblePaths = [
-            // Latest Puppeteer versions
-            path.join(cacheDir, 'chrome/linux-*/chrome-linux64/chrome'),
-            path.join(cacheDir, 'chrome/linux-*/chrome-linux/chrome'),
-            // Older versions
-            path.join(cacheDir, 'chrome/linux-127.0.6533.88/chrome-linux64/chrome'),
-            path.join(cacheDir, 'chrome/linux-127.0.6533.88/chrome-linux/chrome'),
-          ];
           
-          for (const chromePath of possiblePaths) {
-            try {
-              // Handle wildcards
-              if (chromePath.includes('*')) {
-                const basePath = chromePath.substring(0, chromePath.indexOf('*') - 1);
-                const pattern = chromePath.substring(chromePath.indexOf('*'));
-                
-                if (fs.existsSync(basePath)) {
-                  const dirs = fs.readdirSync(basePath);
-                  for (const dir of dirs) {
-                    const fullPath = chromePath.replace(/linux-\*/g, `linux-${dir}`);
-                    if (fs.existsSync(fullPath)) {
-                      executablePath = fullPath;
-                      console.log(`✅ Found Chrome at: ${executablePath}`);
-                      break;
+          // First try to find any chrome directory
+          try {
+            if (fs.existsSync(cacheDir)) {
+              const chromeDirs = [];
+              
+              // Look for chrome directories
+              const findChromeDirs = (dir) => {
+                try {
+                  const items = fs.readdirSync(dir, { withFileTypes: true });
+                  for (const item of items) {
+                    if (item.isDirectory()) {
+                      const fullPath = path.join(dir, item.name);
+                      if (item.name === 'chrome' || item.name.startsWith('chrome-')) {
+                        chromeDirs.push(fullPath);
+                      }
+                      // Recursively search subdirectories (max depth 3)
+                      if (fullPath.split(path.sep).length - dir.split(path.sep).length < 3) {
+                        findChromeDirs(fullPath);
+                      }
                     }
                   }
+                } catch (e) {
+                  // Skip directories we can't read
                 }
-              } else if (fs.existsSync(chromePath)) {
-                executablePath = chromePath;
-                console.log(`✅ Found Chrome at: ${executablePath}`);
-                break;
+              };
+              
+              findChromeDirs(cacheDir);
+              
+              // Now search for chrome executable in found directories
+              for (const chromeDir of chromeDirs) {
+                const possibleExecNames = ['chrome', 'chromium', 'chrome-headless-shell'];
+                const possibleSubDirs = ['chrome-linux64', 'chrome-linux', 'chromium-linux', ''];
+                
+                for (const subDir of possibleSubDirs) {
+                  for (const execName of possibleExecNames) {
+                    const testPath = subDir ? path.join(chromeDir, subDir, execName) : path.join(chromeDir, execName);
+                    if (fs.existsSync(testPath)) {
+                      // Check if it's executable
+                      try {
+                        fs.accessSync(testPath, fs.constants.X_OK);
+                        executablePath = testPath;
+                        console.log(`✅ Found Chrome at: ${executablePath}`);
+                        break;
+                      } catch (e) {
+                        // Not executable, try next
+                        continue;
+                      }
+                    }
+                  }
+                  if (executablePath) break;
+                }
+                if (executablePath) break;
               }
-            } catch (e) {
-              // Try next path
-              continue;
             }
-            
-            if (executablePath) break;
+          } catch (e) {
+            console.log('⚠️  Directory search failed:', e.message);
           }
         }
         

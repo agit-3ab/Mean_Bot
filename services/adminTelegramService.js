@@ -19,13 +19,85 @@ class AdminTelegramService {
     console.log(`Authorized Admins: ${this.authorizedAdmins.length > 0 ? this.authorizedAdmins.join(', ') : 'None configured ❌'}`);
     
     if (this.botToken) {
-      this.bot = new TelegramBot(this.botToken, { polling: true });
-      this.setupCommands();
-      console.log('✅ Admin Telegram Bot Service initialized with polling');
+      this.initializeBot();
     } else {
       console.warn('⚠️  Admin Telegram Bot token not configured');
       console.log('💡 Set ADMIN_TELEGRAM_BOT_TOKEN in .env to enable Admin Telegram bot');
       this.bot = null;
+    }
+  }
+
+  /**
+   * Initialize the bot with webhook cleanup
+   */
+  async initializeBot() {
+    try {
+      // First, delete any existing webhook to prevent 409 conflicts
+      console.log('🔄 [Admin Bot] Deleting any existing webhooks...');
+      const tempBot = new TelegramBot(this.botToken);
+      await tempBot.deleteWebHook();
+      console.log('✅ [Admin Bot] Webhook deleted successfully');
+      
+      // Now start polling
+      this.bot = new TelegramBot(this.botToken, { 
+        polling: {
+          interval: 300,
+          autoStart: true,
+          params: {
+            timeout: 10
+          }
+        }
+      });
+
+      // Handle polling errors
+      this.bot.on('polling_error', (error) => {
+        console.error('[Admin Bot polling_error]', error.message);
+        
+        // If 409 conflict, try to restart polling after delay
+        if (error.message.includes('409')) {
+          console.log('⚠️  [Admin Bot] Detected 409 conflict, attempting recovery...');
+          setTimeout(() => this.recoverFromConflict(), 5000);
+        }
+      });
+
+      this.setupCommands();
+      console.log('✅ Admin Telegram Bot Service initialized with polling');
+    } catch (error) {
+      console.error('❌ [Admin Bot] Failed to initialize bot:', error.message);
+      // Fallback to basic initialization
+      this.bot = new TelegramBot(this.botToken, { polling: true });
+      this.setupCommands();
+    }
+  }
+
+  /**
+   * Recover from 409 conflict by restarting polling
+   */
+  async recoverFromConflict() {
+    try {
+      console.log('🔄 [Admin Bot] Recovering from 409 conflict...');
+      
+      if (this.bot) {
+        // Stop current polling
+        await this.bot.stopPolling();
+        console.log('✅ [Admin Bot] Stopped current polling');
+      }
+
+      // Delete webhook again
+      const tempBot = new TelegramBot(this.botToken);
+      await tempBot.deleteWebHook();
+      console.log('✅ [Admin Bot] Deleted webhook');
+
+      // Wait a bit before restarting
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Restart polling
+      if (this.bot) {
+        await this.bot.startPolling();
+        console.log('✅ [Admin Bot] Polling restarted successfully');
+      }
+    } catch (error) {
+      console.error('❌ [Admin Bot] Failed to recover from conflict:', error.message);
     }
   }
 

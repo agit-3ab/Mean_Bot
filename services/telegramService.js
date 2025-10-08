@@ -10,13 +10,85 @@ class TelegramService {
     this.commandsRegistered = false; // Flag to prevent duplicate command registration
     
     if (this.botToken) {
-      this.bot = new TelegramBot(this.botToken, { polling: true });
-      this.setupCommands();
-      console.log('✅ Telegram Bot Service initialized with polling');
+      this.initializeBot();
     } else {
       console.warn('⚠️  Telegram Bot token not configured');
       console.log('💡 Set TELEGRAM_BOT_TOKEN in .env to enable Telegram notifications');
       this.bot = null;
+    }
+  }
+
+  /**
+   * Initialize the bot with webhook cleanup
+   */
+  async initializeBot() {
+    try {
+      // First, delete any existing webhook to prevent 409 conflicts
+      console.log('🔄 Deleting any existing webhooks...');
+      const tempBot = new TelegramBot(this.botToken);
+      await tempBot.deleteWebHook();
+      console.log('✅ Webhook deleted successfully');
+      
+      // Now start polling
+      this.bot = new TelegramBot(this.botToken, { 
+        polling: {
+          interval: 300,
+          autoStart: true,
+          params: {
+            timeout: 10
+          }
+        }
+      });
+
+      // Handle polling errors
+      this.bot.on('polling_error', (error) => {
+        console.error('[polling_error]', error.message);
+        
+        // If 409 conflict, try to restart polling after delay
+        if (error.message.includes('409')) {
+          console.log('⚠️  Detected 409 conflict, attempting recovery...');
+          setTimeout(() => this.recoverFromConflict(), 5000);
+        }
+      });
+
+      this.setupCommands();
+      console.log('✅ Telegram Bot Service initialized with polling');
+    } catch (error) {
+      console.error('❌ Failed to initialize bot:', error.message);
+      // Fallback to basic initialization
+      this.bot = new TelegramBot(this.botToken, { polling: true });
+      this.setupCommands();
+    }
+  }
+
+  /**
+   * Recover from 409 conflict by restarting polling
+   */
+  async recoverFromConflict() {
+    try {
+      console.log('🔄 Recovering from 409 conflict...');
+      
+      if (this.bot) {
+        // Stop current polling
+        await this.bot.stopPolling();
+        console.log('✅ Stopped current polling');
+      }
+
+      // Delete webhook again
+      const tempBot = new TelegramBot(this.botToken);
+      await tempBot.deleteWebHook();
+      console.log('✅ Deleted webhook');
+
+      // Wait a bit before restarting
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Restart polling
+      if (this.bot) {
+        await this.bot.startPolling();
+        console.log('✅ Polling restarted successfully');
+      }
+    } catch (error) {
+      console.error('❌ Failed to recover from conflict:', error.message);
     }
   }
 
