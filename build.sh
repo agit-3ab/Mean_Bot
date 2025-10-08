@@ -32,62 +32,102 @@ export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
 # Ensure cache directory exists
 mkdir -p /opt/render/.cache/puppeteer
 
-# Install Chrome using Puppeteer's built-in installer with specific version
-echo "Installing Chrome browser for Puppeteer..."
+# Install Chrome using Puppeteer's built-in installer
+echo "Installing Chrome browser for Puppeteer v22..."
 
-# Method 1: Try installing with @puppeteer/browsers (preferred for Puppeteer 22+)
-npx @puppeteer/browsers install chrome@stable --path /opt/render/.cache/puppeteer && {
-    echo "✅ Chrome installed successfully with @puppeteer/browsers"
-} || {
-    echo "⚠️  @puppeteer/browsers method failed, trying alternative..."
+# For Puppeteer v22+, Chrome should be installed automatically during npm install
+# But we'll verify and install if needed
+
+# First, check if Puppeteer already has Chrome
+echo "🔍 Checking if Puppeteer has Chrome bundled..."
+node -e "
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+
+(async () => {
+  try {
+    // Try to get bundled Chrome path
+    const browserPath = puppeteer.executablePath();
+    console.log('Checking bundled Chrome at:', browserPath);
     
-    # Method 2: Use Puppeteer's own installer
-    npx puppeteer browsers install chrome --path /opt/render/.cache/puppeteer || {
-        echo "⚠️  Standard method failed, trying node script..."
+    if (fs.existsSync(browserPath)) {
+      console.log('✅ Puppeteer bundled Chrome found');
+      console.log('Path:', browserPath);
+      
+      // Save this path for runtime
+      const cacheDir = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+      fs.mkdirSync(cacheDir, { recursive: true });
+      fs.writeFileSync(cacheDir + '/chrome_path.txt', browserPath);
+      console.log('✅ Chrome path saved');
+      process.exit(0);
+    } else {
+      console.log('⚠️  Bundled Chrome not found, need to install manually');
+      process.exit(1);
+    }
+  } catch (error) {
+    console.log('⚠️  Error checking bundled Chrome:', error.message);
+    process.exit(1);
+  }
+})();
+" || {
+    echo "⚠️  Bundled Chrome not found, installing manually..."
+    
+    # Method 1: Use node script to download Chrome
+    node -e "
+    const puppeteer = require('puppeteer');
+    const fs = require('fs');
+    const https = require('https');
+    const path = require('path');
+    
+    (async () => {
+      try {
+        const cacheDir = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+        console.log('Installing Chrome to:', cacheDir);
         
-        # Method 3: Use node to install via Puppeteer API
-        node -e "
-        const puppeteer = require('puppeteer');
-        const fs = require('fs');
+        // For Puppeteer 22+, we need to use the new BrowserFetcher
+        const {Browser} = puppeteer;
         
-        (async () => {
-          try {
-            console.log('Attempting to download Chrome browser...');
-            
-            // Try to get the browser fetcher
-            const browserFetcher = puppeteer.createBrowserFetcher({
-              path: '/opt/render/.cache/puppeteer'
-            });
-            
-            console.log('Downloading Chrome...');
-            const revisionInfo = await browserFetcher.download('127.0.6533.88');
-            
-            console.log('✅ Chrome downloaded to:', revisionInfo.executablePath);
-            
-            // Verify it exists
-            if (fs.existsSync(revisionInfo.executablePath)) {
-              console.log('✅ Chrome executable verified');
-              fs.chmodSync(revisionInfo.executablePath, '755');
-            } else {
-              console.log('❌ Chrome executable not found after download');
-              process.exit(1);
-            }
-          } catch (error) {
-            console.error('❌ Chrome installation failed:', error.message);
-            console.log('Attempting fallback installation...');
-            
-            // Last resort: try default installation
-            try {
-              const execPath = puppeteer.executablePath();
-              console.log('Using default Chrome path:', execPath);
-            } catch (e) {
-              console.error('All installation methods failed');
-              process.exit(1);
-            }
-          }
-        })();
-        " || {
-            echo "❌ All Chrome installation methods failed"
+        // Try using puppeteer-core's built-in Chrome downloader
+        const browserFetcher = puppeteer.createBrowserFetcher({
+          path: cacheDir,
+          platform: 'linux',
+        });
+        
+        console.log('📥 Downloading Chrome (this may take a few minutes)...');
+        
+        // Download latest revision
+        const revisionInfo = await browserFetcher.download('1134945');
+        
+        console.log('✅ Chrome downloaded successfully');
+        console.log('Executable path:', revisionInfo.executablePath);
+        
+        // Make it executable
+        if (fs.existsSync(revisionInfo.executablePath)) {
+          fs.chmodSync(revisionInfo.executablePath, 0o755);
+          console.log('✅ Chrome executable permissions set');
+          
+          // Save path for runtime
+          fs.writeFileSync(path.join(cacheDir, 'chrome_path.txt'), revisionInfo.executablePath);
+          console.log('✅ Chrome path saved');
+        }
+        
+      } catch (error) {
+        console.error('❌ Chrome installation failed:', error.message);
+        console.error(error);
+        process.exit(1);
+      }
+    })();
+    " || {
+        echo "❌ All Chrome installation methods failed"
+        echo "Trying system Chromium installation..."
+        
+        # Last resort: try to use system Chromium if available
+        which chromium-browser && {
+            SYSTEM_CHROME=$(which chromium-browser)
+            echo "✅ Found system Chromium: $SYSTEM_CHROME"
+            echo "$SYSTEM_CHROME" > /opt/render/.cache/puppeteer/chrome_path.txt
+        } || {
+            echo "❌ No Chromium installation found"
             exit 1
         }
     }
