@@ -23,6 +23,10 @@ class MITSIMSScraper {
       // Get Puppeteer executable path (for cloud deployment)
       const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
       
+      // Parse additional Puppeteer arguments from environment
+      const additionalArgs = process.env.PUPPETEER_ARGS ? 
+        process.env.PUPPETEER_ARGS.split(',').map(arg => arg.trim()) : [];
+      
       const launchOptions = {
         headless: isHeadless ? 'new' : false,
         slowMo: 100, // Slow down by 100ms for visibility
@@ -34,7 +38,14 @@ class MITSIMSScraper {
           '--disable-gpu',
           '--disable-web-security',
           '--disable-features=VizDisplayCompositor',
-          '--window-size=1366,768'
+          '--window-size=1366,768',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          ...additionalArgs
         ]
       };
       
@@ -42,6 +53,12 @@ class MITSIMSScraper {
       if (executablePath) {
         launchOptions.executablePath = executablePath;
       }
+      
+      console.log('🚀 Launching browser with options:', {
+        headless: launchOptions.headless,
+        executablePath: launchOptions.executablePath || 'default',
+        argsCount: launchOptions.args.length
+      });
       
       this.browser = await puppeteer.launch(launchOptions);
       

@@ -3,8 +3,8 @@ services:
     name: mean-bot
     env: node
     plan: starter
-    region: oregon # Change to your preferred region
-    buildCommand: npm ci --only=production
+    region: oregon
+    buildCommand: npm install --production
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -14,9 +14,7 @@ services:
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: false
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/.cache/puppeteer
-      - key: PUPPETEER_ARGS
-        value: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-accelerated-2d-canvas,--no-first-run,--no-zygote,--single-process,--disable-gpu,--disable-background-timer-throttling,--disable-backgrounding-occluded-windows,--disable-renderer-backgrounding"
+        value: /tmp/.cache/puppeteer
     # Environment variables that need to be set in Render dashboard:
     # - MONGODB_URI (MongoDB connection string)
     # - ENCRYPTION_KEY (32 character encryption key)
