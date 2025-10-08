@@ -9,6 +9,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: USE_MOCK_DATA
+        value: true
       - key: HEADLESS_MODE
         value: true
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
@@ -18,11 +20,13 @@ services:
       - key: PUPPETEER_ARGS
         value: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-accelerated-2d-canvas,--no-first-run,--no-zygote,--single-process,--disable-gpu,--disable-background-timer-throttling,--disable-backgrounding-occluded-windows,--disable-renderer-backgrounding"
     # Environment variables that need to be set in Render dashboard:
-    # - MONGODB_URI (MongoDB connection string)
+    # - MONGODB_URI (MongoDB connection string - OPTIONAL, mock mode will be used if not provided)
     # - ENCRYPTION_KEY (32 character encryption key)
     # - TELEGRAM_BOT_TOKEN (from BotFather)
     # - ADMIN_TELEGRAM_BOT_TOKEN (from BotFather)
     # - ADMIN_TELEGRAM_CHAT_IDS (comma-separated chat IDs)
     # - ATTENDANCE_CHECK_TIME (e.g., "08:00")
     # - MITS_IMS_URL (e.g., "http://mitsims.in")
-    # - USE_MOCK_DATA (set to "false" for production)
+    # 
+    # For production with database, set USE_MOCK_DATA to "false" and provide MONGODB_URI
+    # For testing/demo, leave USE_MOCK_DATA as "true" (no database required)

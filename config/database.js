@@ -3,6 +3,22 @@ require('dotenv').config();
 
 const connectDB = async () => {
   try {
+    // Check if MONGODB_URI is provided
+    if (!process.env.MONGODB_URI) {
+      console.warn('\n⚠️  MONGODB_URI environment variable is not set.');
+      
+      // In production environment, enable mock mode automatically if no DB URI is provided
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('   Production environment detected without MONGODB_URI.');
+        console.warn('   Automatically enabling MOCK MODE for deployment.');
+        process.env.USE_MOCK_DATA = 'true';
+        return null;
+      } else {
+        console.error('   Please set MONGODB_URI environment variable or enable mock mode.');
+        throw new Error('MONGODB_URI not configured');
+      }
+    }
+
     // Remove deprecated options
     const conn = await mongoose.connect(process.env.MONGODB_URI);
 
@@ -28,11 +44,14 @@ const connectDB = async () => {
   } catch (error) {
     console.error('Error connecting to MongoDB:', error.message);
     
-    // Check if mock mode is enabled
-    if (process.env.USE_MOCK_DATA === 'true') {
+    // Check if mock mode is enabled or should be enabled
+    if (process.env.USE_MOCK_DATA === 'true' || process.env.NODE_ENV === 'production') {
       console.warn('\n⚠️  MongoDB is not available, but MOCK MODE is enabled.');
       console.warn('   The system will work with sample data.');
       console.warn('   Database features (save/retrieve records) will not work.\n');
+      
+      // Ensure mock mode is enabled
+      process.env.USE_MOCK_DATA = 'true';
       return null; // Return null instead of exiting
     } else {
       console.error('\n⚠️  MongoDB is not available. Please either:');
