@@ -25,53 +25,77 @@ fi
 echo "🌐 Installing Chromium for Puppeteer..."
 echo "Cache directory: ${PUPPETEER_CACHE_DIR:-/opt/render/.cache/puppeteer}"
 
-# Method 1: Use npx puppeteer browsers install
-echo "Attempting Method 1: npx puppeteer browsers install chrome..."
-npx puppeteer browsers install chrome --path /opt/render/.cache/puppeteer || {
-    echo "⚠️  Method 1 failed, trying Method 2..."
+# Set Puppeteer cache directory environment variable
+export PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer
+
+# Install Chrome using Puppeteer's built-in installer
+echo "Installing Chrome browser for Puppeteer..."
+npx puppeteer browsers install chrome || {
+    echo "⚠️  npx method failed, trying alternative methods..."
     
-    # Method 2: Use node script to download browser
-    echo "Attempting Method 2: Node.js script..."
+    # Fallback: Use node to install via Puppeteer API
     node -e "
     const puppeteer = require('puppeteer');
+    const fs = require('fs');
+    
     (async () => {
       try {
-        const browserFetcher = puppeteer.createBrowserFetcher({ path: '/opt/render/.cache/puppeteer' });
-        const revisionInfo = await browserFetcher.download('1134058');
-        console.log('✅ Chromium downloaded to:', revisionInfo.executablePath);
+        console.log('Attempting to install Chrome browser...');
+        
+        // Install browser using Puppeteer (this will handle the download)
+        const execPath = await puppeteer.executablePath();
+        console.log('✅ Puppeteer Chrome path:', execPath);
+        
+        // Verify it exists
+        if (fs.existsSync(execPath)) {
+          console.log('✅ Chrome executable verified at:', execPath);
+        } else {
+          console.log('❌ Chrome executable not found, attempting manual install...');
+          process.exit(1);
+        }
       } catch (error) {
-        console.error('❌ Download failed:', error.message);
+        console.error('❌ Chrome installation failed:', error.message);
         process.exit(1);
       }
     })();
     " || {
-        echo "⚠️  Method 2 failed, trying Method 3..."
-        
-        # Method 3: Force reinstall puppeteer with browser
-        echo "Attempting Method 3: Reinstall Puppeteer..."
-        PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npm install puppeteer --force
+        echo "⚠️  All methods failed, Chrome may not be available"
+        exit 1
     }
 }
 
 # Verify Chromium installation
 echo "🔍 Verifying Chromium installation..."
-if [ -d "/opt/render/.cache/puppeteer" ]; then
-    echo "✅ Puppeteer cache directory exists"
-    ls -la /opt/render/.cache/puppeteer/ || true
+
+# Find Chrome executable recursively
+CHROME_PATH=$(find /opt/render/.cache/puppeteer -name "chrome" -type f -executable 2>/dev/null | grep -E "chrome-linux|chrome-headless-shell" | head -n 1)
+
+if [ -n "$CHROME_PATH" ]; then
+    echo "✅ Chrome executable found at: $CHROME_PATH"
     
-    # Find Chrome executable
-    CHROME_PATH=$(find /opt/render/.cache/puppeteer -name chrome -type f 2>/dev/null | head -n 1)
-    if [ -n "$CHROME_PATH" ]; then
-        echo "✅ Chrome executable found at: $CHROME_PATH"
-        echo "PUPPETEER_EXECUTABLE_PATH=$CHROME_PATH" >> $HOME/.profile
+    # Test if it's actually executable
+    if [ -x "$CHROME_PATH" ]; then
+        echo "✅ Chrome is executable"
+        $CHROME_PATH --version || echo "⚠️  Could not get Chrome version"
     else
-        echo "⚠️  Chrome executable not found!"
-        echo "Listing all files in puppeteer cache:"
-        find /opt/render/.cache/puppeteer -type f 2>/dev/null || true
+        echo "⚠️  Chrome found but not executable, setting permissions..."
+        chmod +x $CHROME_PATH
     fi
+    
+    # Export for use in the application
+    export PUPPETEER_EXECUTABLE_PATH="$CHROME_PATH"
+    echo "PUPPETEER_EXECUTABLE_PATH=$CHROME_PATH"
 else
-    echo "❌ Puppeteer cache directory not found at /opt/render/.cache/puppeteer"
+    echo "❌ Chrome executable not found!"
+    echo "📂 Listing puppeteer cache contents:"
+    find /opt/render/.cache/puppeteer -type f 2>/dev/null | head -20 || echo "No files found"
+    
+    echo "📂 Checking for Chrome in common locations:"
+    ls -la /opt/render/.cache/puppeteer/chrome/ 2>/dev/null || echo "Chrome directory not found"
+    
     exit 1
 fi
+
+echo "✅ Build completed successfully!"
 
 echo "✅ Build completed successfully!"
