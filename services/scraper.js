@@ -21,7 +21,36 @@ class MITSIMSScraper {
       const isHeadless = process.env.HEADLESS_MODE !== 'false';
       
       // Get Puppeteer executable path (for cloud deployment)
-      const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
+      let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
+      
+      // If no executable path set, try to find Chrome in common locations
+      if (!executablePath && process.env.NODE_ENV === 'production') {
+        const fs = require('fs');
+        const path = require('path');
+        const possiblePaths = [
+          '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome',
+          '/opt/render/.cache/puppeteer/chrome/linux-*/chrome-linux64/chrome',
+          path.join(process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer', 'chrome/linux-127.0.6533.88/chrome-linux64/chrome')
+        ];
+        
+        for (const chromePath of possiblePaths) {
+          try {
+            if (fs.existsSync(chromePath)) {
+              executablePath = chromePath;
+              console.log(`✅ Found Chrome at: ${executablePath}`);
+              break;
+            }
+          } catch (e) {
+            // Try next path
+          }
+        }
+        
+        if (!executablePath) {
+          console.error('❌ Chrome executable not found in any expected location!');
+          console.error('Tried paths:', possiblePaths);
+          throw new Error('Chrome executable not found. Please ensure Chromium is installed during build.');
+        }
+      }
       
       // Parse additional Puppeteer arguments from environment
       const additionalArgs = process.env.PUPPETEER_ARGS ? 
@@ -56,7 +85,7 @@ class MITSIMSScraper {
       
       console.log('🚀 Launching browser with options:', {
         headless: launchOptions.headless,
-        executablePath: launchOptions.executablePath || 'default',
+        executablePath: launchOptions.executablePath || 'default (bundled)',
         argsCount: launchOptions.args.length
       });
       

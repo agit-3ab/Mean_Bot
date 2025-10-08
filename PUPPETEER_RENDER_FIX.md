@@ -13,25 +13,54 @@ Render deployments don't automatically install Chromium when you install Puppete
 
 ## Solution Applied
 
-### 1. Updated `build.sh`
-Added Chromium installation step:
+### Latest Fix (2025-10-08 - Second Iteration)
+
+**Enhanced approach with multiple fallback methods:**
+
+### 1. Updated `build.sh` (Enhanced)
+Added three-tier installation strategy:
 ```bash
-# Install Chromium for Puppeteer (CRITICAL for Render deployment)
-echo "🌐 Installing Chromium for Puppeteer..."
-npx puppeteer browsers install chrome
+# Method 1: Direct installation with path specification
+npx puppeteer browsers install chrome --path /opt/render/.cache/puppeteer
+
+# Method 2: Node.js script with BrowserFetcher (fallback)
+node -e "const puppeteer = require('puppeteer'); ..."
+
+# Method 3: Force reinstall (last resort)
+PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npm install puppeteer --force
 ```
 
-### 2. Updated `package.json`
-Changed postinstall script:
-```json
-"postinstall": "npx puppeteer browsers install chrome"
-```
+The script now:
+- Tries multiple installation methods
+- Verifies Chrome executable exists
+- Exports `PUPPETEER_EXECUTABLE_PATH` to environment
+- Provides detailed logging for debugging
 
-### 3. Updated `render.yaml`
-Changed build command to use `build.sh`:
+### 2. Updated `render.yaml` (Critical Addition)
+Added `PUPPETEER_EXECUTABLE_PATH` environment variable:
 ```yaml
-buildCommand: chmod +x build.sh && ./build.sh
+- key: PUPPETEER_EXECUTABLE_PATH
+  value: /opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome
 ```
+
+This explicitly tells Puppeteer where to find Chrome.
+
+### 3. Updated `services/scraper.js` (Auto-Detection)
+Enhanced Chrome detection with fallback paths:
+```javascript
+// Auto-detect Chrome if PUPPETEER_EXECUTABLE_PATH not set
+const possiblePaths = [
+  '/opt/render/.cache/puppeteer/chrome/linux-127.0.6533.88/chrome-linux64/chrome',
+  // ... other possible locations
+];
+
+// Check each path and use first one found
+```
+
+This ensures the scraper can find Chrome even if environment variable is incorrect.
+
+### 4. Created `render-with-chromium.yaml`
+Alternative simplified configuration that relies on npm's postinstall hook.
 
 ## How to Deploy the Fix
 

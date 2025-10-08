@@ -1,0 +1,46 @@
+# Alternative Render configuration with built-in Chromium support
+# This uses Puppeteer's automatic Chromium download during npm install
+
+services:
+  - type: web
+    name: mean-bot
+    env: node
+    plan: starter
+    region: oregon
+    
+    # Simple build: just install dependencies (Chromium installs automatically via postinstall)
+    buildCommand: npm install
+    
+    startCommand: node server.js
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+        
+      - key: USE_MOCK_DATA
+        value: false
+        
+      - key: HEADLESS_MODE
+        value: true
+        
+      # Puppeteer configuration - let it download Chromium automatically
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: false
+        
+      # Let Puppeteer use default cache location
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/.cache/puppeteer
+        
+      # Browser arguments for Render (no GPU, no sandbox)
+      - key: PUPPETEER_ARGS
+        value: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu"
+    
+    # IMPORTANT: Set these in Render Dashboard (not in this file for security)
+    # - MONGODB_URI (your MongoDB Atlas connection string)
+    # - ENCRYPTION_KEY (32 character key for encrypting passwords)
+    # - TELEGRAM_BOT_TOKEN (from @BotFather)
+    # - ADMIN_TELEGRAM_BOT_TOKEN (from @BotFather)
+    # - ADMIN_TELEGRAM_CHAT_IDS (comma-separated admin chat IDs)
+    # - ATTENDANCE_CHECK_TIME (e.g., "07:00")
+    # - MITS_IMS_URL (e.g., "http://mitsims.in")
