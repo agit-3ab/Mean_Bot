@@ -48,24 +48,30 @@ const connectDB = async () => {
   } catch (error) {
     console.error('Error connecting to MongoDB:', error.message);
     
-    // In production, always enable mock mode on connection failure
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('\n⚠️  MongoDB connection failed in production environment.');
-      console.warn('   Automatically enabling MOCK MODE for deployment.');
-      console.warn('   The system will work with sample data.');
-      console.warn('   Database features (save/retrieve records) will not work.\n');
-      
-      // Ensure mock mode is enabled
-      process.env.USE_MOCK_DATA = 'true';
-      return null; // Return null instead of exiting
-    }
+    // Check if mock mode is explicitly enabled OR if we're in production without a DB URI
+    const mockModeExplicit = process.env.USE_MOCK_DATA === 'true';
+    const productionWithoutDB = process.env.NODE_ENV === 'production' && !process.env.MONGODB_URI;
+    const shouldUseMockMode = mockModeExplicit || productionWithoutDB;
     
-    // In development, check if mock mode is enabled
-    if (process.env.USE_MOCK_DATA === 'true') {
-      console.warn('\n⚠️  MongoDB is not available, but MOCK MODE is enabled.');
-      console.warn('   The system will work with sample data.');
-      console.warn('   Database features (save/retrieve records) will not work.\n');
-      return null;
+    if (shouldUseMockMode) {
+      // Automatically enable mock mode
+      process.env.USE_MOCK_DATA = 'true';
+      
+      console.warn('\n⚠️  MongoDB connection failed.');
+      console.warn('   MOCK MODE is enabled - the system will work with sample data.');
+      console.warn('   Database features (save/retrieve records) will not work.');
+      
+      if (process.env.NODE_ENV === 'production') {
+        if (!process.env.MONGODB_URI) {
+          console.warn('   No MONGODB_URI provided - running with mock data.\n');
+        } else {
+          console.warn('   Production environment - check your MongoDB connection string.\n');
+        }
+      } else {
+        console.warn('   To use real database, configure MONGODB_URI in .env file.\n');
+      }
+      
+      return null; // Return null instead of exiting
     }
     
     // Only show error and exit in development without mock mode

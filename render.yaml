@@ -4,13 +4,13 @@ services:
     env: node
     plan: starter
     region: oregon # Change to your preferred region
-    buildCommand: npm ci --only=production
-    startCommand: npm start
+    buildCommand: npm ci
+    startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: USE_MOCK_DATA
-        value: true
+        value: false
       - key: HEADLESS_MODE
         value: true
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
